@@ -1,95 +1,94 @@
-name:               persistent-odbc
-version:            0.2.0.1
-synopsis:           Backend for the persistent library using ODBC
-license:            MIT
-license-file:       LICENSE
-author:             Grant Weyburne
-maintainer:         gbwey9@gmail.com
-category:           Database, Yesod
-cabal-version:      >= 1.8
-build-type:         Simple
-stability:          Experimental
-homepage:           https://github.com/gbwey/persistent-odbc
-bug-reports:        https://github.com/gbwey/persistent-odbc/issues
-description:
-    This package contains backends for persistent using ODBC.
-    It currently supports the following databases: MSSQL, MySql, Oracle, Sqlite, DB2, Postgres.
-    Uses HDBC-ODBC for accessing ODBC.
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 9f127e1c0f59cca9374c2f455dc7def3e66cbb9786e8ac24ebb0d1879565c00e
 
-Flag debug
-  Default: False
-
-Flag tester
-  Default: False
-
-library
-  if flag(debug)
-    cpp-options: -DDEBUG
-
-  exposed-modules:    Database.Persist.ODBC
-                    , Database.Persist.ODBCTypes
-                    , Database.Persist.MigrateOracle
-                    , Database.Persist.MigratePostgres
-                    , Database.Persist.MigrateSqlite
-                    , Database.Persist.MigrateMSSQL
-                    , Database.Persist.MigrateMySQL
-                    , Database.Persist.MigrateDB2
-
-  ghc-options:   -Wall
-  hs-source-dirs: src
-
-  build-depends:      base         >= 4.5        && < 5
-                    , text          >= 0.11.2     && < 1.3
-                    , aeson         >= 0.6
-                    , time          >= 1.1
-                    , conduit       >= 1.0
-                    , containers    >= 0.4
-                    , transformers  >= 0.3
-                    , convertible   >= 1.0
-                    , HDBC          >= 2.2
-                    , HDBC-odbc     >= 2.4
-                    , monad-logger
-                    , resourcet
-                    , monad-control
-                    , persistent-template >= 2.1 && < 3
-                    , persistent    >= 2.6.1 && < 3
-                    , bytestring    >= 0.9        && < 0.11
-
-
-  if flag(tester)
-                    hs-source-dirs: examples
-                    exposed-modules: TestODBC
-                                   , FtypeEnum
-                                   , Employment
-                    build-depends: blaze-html
-                                 , esqueleto >= 2.1 && < 3
-Executable TestODBC
-  if flag(tester)
-      build-depends:  base         >= 4.5        && < 5
-                     , persistent-odbc
-                     , blaze-html
-                     , esqueleto    >= 2.1 && < 3
-                    , text          >= 0.11.2     && < 1.3
-                    , aeson         >= 0.6
-                    , time          >= 1.1
-                    , conduit       >= 1.0
-                    , containers    >= 0.4
-                    , transformers  >= 0.3
-                    , convertible   >= 1.0
-                    , HDBC          >= 2.2
-                    , HDBC-odbc     >= 2.4
-                    , monad-logger
-                    , resourcet
-                    , monad-control
-                    , persistent-template >= 2.1 && < 3
-                    , persistent    >= 2.6.1 && < 3
-                    , bytestring    >= 0.9        && < 0.11
-  else
-      buildable: False
-  Main-Is:         TestODBC.hs
-  Hs-Source-Dirs:  examples
-  Other-Modules:   FtypeEnum, Employment,Test1
+name:           persistent-odbc
+version:        0.2.0.1
+synopsis:       Backend for the persistent library using ODBC
+description:    This package contains backends for persistent using ODBC. It currently supports the following databases: MSSQL, MySql, Oracle, Sqlite, DB2, Postgres. Uses HDBC-ODBC for accessing ODBC.
+category:       Database, Yesod
+stability:      Experimental
+homepage:       https://github.com/gbwey/persistent-odbc#readme
+bug-reports:    https://github.com/gbwey/persistent-odbc/issues
+author:         Grant Weyburne
+maintainer:     gbwey9@gmail.com
+license:        MIT
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+extra-source-files:
+    ChangeLog.md
+    README.md
 
 source-repository head
-  type:     git
-  location: git://github.com/gbwey/persistent-odbc.git
+  type: git
+  location: https://github.com/gbwey/persistent-odbc
+
+library
+  exposed-modules:
+      Database.Persist.MigrateDB2
+      Database.Persist.MigrateMSSQL
+      Database.Persist.MigrateMySQL
+      Database.Persist.MigrateOracle
+      Database.Persist.MigratePostgres
+      Database.Persist.MigrateSqlite
+      Database.Persist.ODBC
+      Database.Persist.ODBCTypes
+  other-modules:
+      Paths_persistent_odbc
+  hs-source-dirs:
+      src
+  build-depends:
+      HDBC
+    , HDBC-odbc
+    , aeson
+    , base >=4.5 && <5
+    , bytestring
+    , conduit
+    , containers
+    , convertible
+    , monad-control
+    , monad-logger
+    , persistent
+    , persistent-template
+    , resourcet
+    , text
+    , time
+    , transformers
+  if flag(debug)
+    cpp-options: -DDEBUG
+  default-language: Haskell2010
+
+test-suite TestODBC
+  type: exitcode-stdio-1.0
+  main-is: TestODBC.hs
+  other-modules:
+      FtypeEnum
+      Employment
+      Test1
+  hs-source-dirs:
+      examples
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      HDBC
+    , HDBC-odbc
+    , aeson
+    , base >=4.5 && <5
+    , blaze-html
+    , bytestring
+    , conduit
+    , containers
+    , convertible
+    , esqueleto
+    , monad-control
+    , monad-logger
+    , persistent
+    , persistent-odbc
+    , persistent-template
+    , resourcet
+    , text
+    , time
+    , transformers
+  default-language: Haskell2010

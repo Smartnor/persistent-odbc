@@ -1,0 +1,64 @@
+name:                persistent-odbc
+version:             0.2.0.1
+synopsis:            Backend for the persistent library using ODBC
+github:              gbwey/persistent-odbc
+license:             MIT
+author:              Grant Weyburne
+maintainer:          gbwey9@gmail.com
+category:            Database, Yesod
+stability:           Experimental
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:
+      "This package contains backends for persistent using ODBC.
+      It currently supports the following databases:
+      MSSQL, MySql, Oracle, Sqlite, DB2, Postgres.
+      Uses HDBC-ODBC for accessing ODBC."
+
+dependencies:
+ - base         >= 4.5        && < 5
+ - text          
+ - aeson         
+ - time          
+ - conduit       
+ - containers    
+ - transformers  
+ - convertible   
+ - HDBC          
+ - HDBC-odbc     
+ - monad-logger
+ - resourcet
+ - monad-control
+ - persistent-template 
+ - persistent    
+ - bytestring   
+
+library:
+  source-dirs: src
+  when:
+  - condition: flag(debug)
+    cpp-options: -DDEBUG
+
+
+tests:
+  TestODBC:
+    main:                TestODBC.hs
+    source-dirs:         examples
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - blaze-html
+    - esqueleto
+    - persistent-odbc
+    other-modules:
+    - FtypeEnum
+    - Employment
+    - Test1

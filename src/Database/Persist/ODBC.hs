@@ -33,6 +33,7 @@ import qualified Database.HDBC.SqlValue as HSV
 import qualified Data.Convertible as DC
 
 import Control.Monad.IO.Class (MonadIO (..))
+import Control.Monad.Trans.Resource (MonadUnliftIO (..))
 import Data.IORef(newIORef)
 import qualified Data.Map as Map
 import qualified Data.Text as T
@@ -58,7 +59,7 @@ type ConnectionString = String
 -- finishes using it.  Note that you should not use the given
 -- 'ConnectionPool' outside the action since it may be already
 -- been released.
-withODBCPool :: (MonadBaseControl IO m, MonadLogger m, MonadIO m)
+withODBCPool :: (MonadBaseControl IO m, MonadLogger m, MonadUnliftIO m)
              => Maybe DBType 
              -> ConnectionString
              -- ^ Connection string to the database.
@@ -76,7 +77,7 @@ withODBCPool dbt ci = withSqlPool (\lg -> open' lg dbt ci)
 -- responsibility to properly close the connection pool when
 -- unneeded.  Use 'withODBCPool' for an automatic resource
 -- control.
-createODBCPool :: (MonadLogger m, MonadIO m, MonadBaseControl IO m)
+createODBCPool :: (MonadLogger m, MonadUnliftIO m, MonadBaseControl IO m)
                => Maybe DBType 
                -> ConnectionString
                -- ^ Connection string to the database.
@@ -88,7 +89,7 @@ createODBCPool dbt ci = createSqlPool (\lg -> open' lg dbt ci)
 
 -- | Same as 'withODBCPool', but instead of opening a pool
 -- of connections, only one connection is opened.
-withODBCConn :: (MonadLogger m, MonadIO m, MonadBaseControl IO m)
+withODBCConn :: (MonadLogger m, MonadUnliftIO  m, MonadBaseControl IO m)
              => Maybe DBType -> ConnectionString -> (SqlBackend -> m a) -> m a
 withODBCConn dbt cs = withSqlConn (\lg -> open' lg dbt cs)
 

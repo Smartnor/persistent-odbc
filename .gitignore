@@ -1,6 +1,7 @@
 dist/
 cabal-dev/
 .cabal-sandbox/
+.stack-work/
 packages/
 i386-windows-ghc-7.6.3-packages.conf.d/
 add-source-timestamps
@@ -19,5 +20,6 @@ tags
 *.swp
 *.swo
 *.sav
+build.log
 tags
 *~
