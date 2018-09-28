@@ -41,9 +41,8 @@ dependencies:
 
 library:
   source-dirs: src
-  when:
-  - condition: flag(debug)
-    cpp-options: -DDEBUG
+  ghc-options:
+  - -Wall
 
 
 tests:

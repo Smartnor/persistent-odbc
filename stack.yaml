@@ -19,7 +19,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-12.10
+resolver: lts-10.6
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -46,10 +46,12 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps:
 - HDBC-odbc-2.5.0.1
+- base-4.10.1.0
 - network-2.8.0.0
-- persistent-2.8.2
-- github: bitemyapp/esqueleto
-  commit: 434f81ed41795e3dd0754dbc5c75c4ed098631b3
+- resourcet-1.2.1
+- conduit-1.3.0
+- conduit-extra-1.3.0
+- persistent-2.8.1
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
