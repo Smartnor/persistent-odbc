@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: edd6f3c8f131ae3b0f023f51083a1ab5fcd51f966709f35795a7e36cc5f7f44f
+-- hash: ac96aec2ef3888d762b962512c9b60839a3bb100e4837ba166441ad78680fcd9
 
 name:           persistent-odbc
 version:        0.2.0.1
@@ -47,14 +47,14 @@ library
     , aeson
     , base >=4.5 && <5
     , bytestring
-    , conduit
+    , conduit >=1.3 && <2
     , containers
     , convertible
     , monad-control
     , monad-logger
-    , persistent
+    , persistent >=2.8 && <3
     , persistent-template
-    , resourcet
+    , resourcet >=1.2 && <2
     , text
     , time
     , transformers
@@ -77,16 +77,16 @@ test-suite TestODBC
     , base >=4.5 && <5
     , blaze-html
     , bytestring
-    , conduit
+    , conduit >=1.3 && <2
     , containers
     , convertible
     , esqueleto
     , monad-control
     , monad-logger
-    , persistent
+    , persistent >=2.8 && <3
     , persistent-odbc
     , persistent-template
-    , resourcet
+    , resourcet >=1.2 && <2
     , text
     , time
     , transformers
