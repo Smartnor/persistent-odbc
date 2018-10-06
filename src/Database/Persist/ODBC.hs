@@ -147,6 +147,7 @@ openSimpleConn logFunc mdbtype conn = do
         , connLimitOffset   = dbmsLimitOffset mig
         , connMaxParams     = Nothing
         , connUpsertSql     = Nothing
+        , connPutManySql    = Nothing
         }
 -- | Choose the migration strategy based on the user provided database type
 getMigrationStrategy::DBType -> MigrationStrategy
@@ -179,7 +180,7 @@ execute' query vals = fmap fromInteger $ O.execute query $ map (HSV.toSql . P) v
 withStmt' :: MonadIO m
           => O.Statement
           -> [PersistValue]
-          -> Acquire (Source m [PersistValue])
+          -> Acquire (ConduitT () [PersistValue] m ()) 
 withStmt' stmt vals = do
 #if DEBUG
     liftIO $ putStrLn $ "withStmt': vals: " ++ show vals
