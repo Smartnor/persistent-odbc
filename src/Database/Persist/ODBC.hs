@@ -1,8 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
 -- | An ODBC backend for persistent.
 module Database.Persist.ODBC
     ( withODBCPool
@@ -16,42 +17,42 @@ module Database.Persist.ODBC
     , mysql,postgres,mssqlMin2012,mssql,oracleMin12c,oracle,db2,sqlite
     ) where
 
-import qualified Control.Exception as E -- (catch, SomeException)
-import Database.Persist.Sql
+import qualified Control.Exception                as E
+import qualified Database.Persist.MigrateDB2      as DB2
+import qualified Database.Persist.MigrateMSSQL    as MSSQL
+import qualified Database.Persist.MigrateMySQL    as MYSQL
+import qualified Database.Persist.MigrateOracle   as ORACLE
 import qualified Database.Persist.MigratePostgres as PG
-import qualified Database.Persist.MigrateMySQL as MYSQL
-import qualified Database.Persist.MigrateMSSQL as MSSQL
-import qualified Database.Persist.MigrateOracle as ORACLE
-import qualified Database.Persist.MigrateDB2 as DB2
-import qualified Database.Persist.MigrateSqlite as SQLITE
+import qualified Database.Persist.MigrateSqlite   as SQLITE
+import           Database.Persist.Sql
 
-import Data.Time(ZonedTime(..))
+import           Data.Time                        (ZonedTime (..))
 
-import qualified Database.HDBC.ODBC as O
-import qualified Database.HDBC as O
-import qualified Database.HDBC.SqlValue as HSV
-import qualified Data.Convertible as DC
+import qualified Data.Convertible                 as DC
+import qualified Database.HDBC                    as O
+import qualified Database.HDBC.ODBC               as O
+import qualified Database.HDBC.SqlValue           as HSV
 
-import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Trans.Resource (MonadUnliftIO (..))
-import Data.IORef(newIORef)
-import qualified Data.Map as Map
-import qualified Data.Text as T
-import Data.Time.LocalTime (localTimeToUTC, utc)
-import Data.Text (Text)
-import Data.Aeson -- (Object(..), (.:))
-import Control.Monad (mzero)
-import Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad                    (mzero)
+import           Control.Monad.IO.Class           (MonadIO (..))
+import           Control.Monad.Trans.Control      (MonadBaseControl)
+import           Control.Monad.Trans.Resource
+import           Data.Aeson
+import           Data.IORef                       (newIORef)
+import qualified Data.Map                         as Map
+import           Data.Text                        (Text)
+import qualified Data.Text                        as T
+import           Data.Time.LocalTime              (localTimeToUTC, utc)
 --import Control.Monad.Trans.Resource (MonadResource)
-import Control.Monad.Logger
+import           Control.Monad.Logger
 
-import Data.Int (Int64)
-import Data.Conduit
-import Database.Persist.ODBCTypes
-import qualified Data.List as L
-import Data.Acquire (Acquire, mkAcquire)
+import           Data.Acquire                     (Acquire, mkAcquire)
+import           Data.Conduit
+import           Data.Int                         (Int64)
+import qualified Data.List                        as L
+import           Database.Persist.ODBCTypes
 -- | An @HDBC-odbc@ connection string.  A simple example of connection
--- string would be @DSN=hdbctest1@. 
+-- string would be @DSN=hdbctest1@.
 type ConnectionString = String
 
 -- | Create an ODBC connection pool and run the given
@@ -60,7 +61,7 @@ type ConnectionString = String
 -- 'ConnectionPool' outside the action since it may be already
 -- been released.
 withODBCPool :: (MonadBaseControl IO m, MonadLogger m, MonadUnliftIO m)
-             => Maybe DBType 
+             => Maybe DBType
              -> ConnectionString
              -- ^ Connection string to the database.
              -> Int
@@ -78,7 +79,7 @@ withODBCPool dbt ci = withSqlPool (\lg -> open' lg dbt ci)
 -- unneeded.  Use 'withODBCPool' for an automatic resource
 -- control.
 createODBCPool :: (MonadLogger m, MonadUnliftIO m, MonadBaseControl IO m)
-               => Maybe DBType 
+               => Maybe DBType
                -> ConnectionString
                -- ^ Connection string to the database.
                -> Int
@@ -95,24 +96,24 @@ withODBCConn dbt cs = withSqlConn (\lg -> open' lg dbt cs)
 
 -- | helper function that returns a connection based on the database type
 open' :: LogFunc -> Maybe DBType -> ConnectionString -> IO SqlBackend
-open' logFunc mdbtype cstr = 
+open' logFunc mdbtype cstr =
     O.connectODBC cstr >>= openSimpleConn logFunc mdbtype
 
--- | returns a supported database type based on its version 
+-- | returns a supported database type based on its version
 -- if the user does not provide the database type explicitly I look it up based on connection metadata
 findDBMS::(String, String, String) -> DBType
-findDBMS dvs@(driver,ver,serverver) 
+findDBMS dvs@(driver,ver,serverver)
     | driver=="Oracle" = Oracle $ getServerVersionNumber dvs>=12
-    | "DB2" `L.isPrefixOf` driver = DB2 
+    | "DB2" `L.isPrefixOf` driver = DB2
     | driver=="Microsoft SQL Server" = MSSQL $ getServerVersionNumber dvs>=11
-    | driver=="MySQL" = MySQL 
-    | "PostgreSQL" `L.isPrefixOf` driver = Postgres  
+    | driver=="MySQL" = MySQL
+    | "PostgreSQL" `L.isPrefixOf` driver = Postgres
     | "SQLite" `L.isPrefixOf` driver = Sqlite False
     | otherwise = error $ "unknown or unsupported driver[" ++ driver ++ "] ver[" ++ ver ++ "] serverver[" ++ serverver ++ "]\nExplicitly set the type of dbms using DBType and try again!"
 
--- | extracts the server version number 
+-- | extracts the server version number
 getServerVersionNumber::(String, String, String) -> Integer
-getServerVersionNumber (driver, ver, serverver) = 
+getServerVersionNumber (driver, ver, serverver) =
       case reads $ takeWhile (/='.') serverver of
         [(a,"")] -> a
         xs -> error $ "getServerVersionNumber of findDBMS:cannot tell the version xs=" ++show xs ++ ":" ++ "driver[" ++ driver ++ "] ver[" ++ ver ++ "] serverver[" ++ serverver ++ "]"
@@ -121,10 +122,10 @@ getServerVersionNumber (driver, ver, serverver) =
 -- | Generate a persistent 'Connection' from an odbc 'O.Connection'
 openSimpleConn :: LogFunc -> Maybe DBType -> O.Connection -> IO SqlBackend
 openSimpleConn logFunc mdbtype conn = do
-    let mig=case mdbtype of 
-              Nothing -> getMigrationStrategy $ findDBMS (O.proxiedClientName conn, O.proxiedClientVer conn, O.dbServerVer conn) 
+    let mig=case mdbtype of
+              Nothing -> getMigrationStrategy $ findDBMS (O.proxiedClientName conn, O.proxiedClientVer conn, O.dbServerVer conn)
               Just dbtype -> getMigrationStrategy dbtype
-      
+
     smap <- newIORef Map.empty
     return SqlBackend
         { connLogFunc       = logFunc
@@ -134,8 +135,8 @@ openSimpleConn logFunc mdbtype conn = do
         , connInsertManySql = Nothing
         , connClose         = O.disconnect conn
         , connMigrateSql    = dbmsMigrate mig
-        , connBegin         = const 
-                     $ E.catch (O.commit conn) (\(_ :: E.SomeException) -> return ())  
+        , connBegin         = const
+                     $ E.catch (O.commit conn) (\(_ :: E.SomeException) -> return ())
             -- there is no nested transactions.
             -- Transaction begining means that previous commited
         , connCommit        = const $ O.commit   conn
@@ -149,7 +150,7 @@ openSimpleConn logFunc mdbtype conn = do
         }
 -- | Choose the migration strategy based on the user provided database type
 getMigrationStrategy::DBType -> MigrationStrategy
-getMigrationStrategy dbtype = 
+getMigrationStrategy dbtype =
   case dbtype of
     Postgres  -> PG.getMigrationStrategy dbtype
     MySQL     -> MYSQL.getMigrationStrategy dbtype
@@ -164,7 +165,7 @@ prepare' conn sql = do
     putStrLn $ "Database.Persist.ODBC.prepare': sql = " ++ T.unpack sql
 #endif
     stmt <- O.prepare conn $ T.unpack sql
-    
+
     return Statement
         { stmtFinalize  = O.finish stmt
         , stmtReset     = return () -- rollback conn ?
@@ -184,14 +185,14 @@ withStmt' stmt vals = do
     liftIO $ putStrLn $ "withStmt': vals: " ++ show vals
 #endif
     result <- mkAcquire openS closeS
-    return $ pull result 
+    return $ pull result
     --bracketP openS closeS pull
   where
     openS       = execute' stmt vals >> return ()
     closeS _    = O.finish stmt
     pull x      = do
         mr <- liftIO $ O.fetchRow stmt
-        maybe (return ()) 
+        maybe (return ())
               (\r -> do
 #if DEBUG
                     liftIO $ putStrLn $ "withStmt': yield: " ++ show r
@@ -210,7 +211,7 @@ data OdbcConf = OdbcConf
       -- ^ The connection string.
     , odbcPoolSize :: Int
       -- ^ How many connections should be held on the connection pool.
-    , odbcDbtype :: String
+    , odbcDbtype   :: String
     }
 
 instance PersistConfig OdbcConf where
@@ -245,16 +246,16 @@ instance DC.Convertible P HSV.SqlValue where
     safeConvert (P PersistNull)                 = Right HSV.SqlNull
     safeConvert (P (PersistList l))             = Right $ HSV.toSql $ listToJSON l
     safeConvert (P (PersistMap m))              = Right $ HSV.toSql $ mapToJSON m
-    safeConvert p@(P (PersistObjectId _))       = Left DC.ConvertError 
+    safeConvert p@(P (PersistObjectId _))       = Left DC.ConvertError
         { DC.convSourceValue   = show p
-        , DC.convSourceType    = "P (PersistValue)" 
+        , DC.convSourceType    = "P (PersistValue)"
         , DC.convDestType      = "SqlValue"
         , DC.convErrorMessage  = "Refusing to serialize a PersistObjectId to an ODBC value" }
     safeConvert xs                              = error $ "unhandled safeConvert xs=" ++ show xs
 
 
 -- FIXME: check if those are correct and complete.
-instance DC.Convertible HSV.SqlValue P where 
+instance DC.Convertible HSV.SqlValue P where
     safeConvert (HSV.SqlString s)        = Right $ P $ PersistText $ T.pack s
     safeConvert (HSV.SqlByteString bs)   = Right $ P $ PersistByteString bs
     safeConvert v@(HSV.SqlWord32 _)      = Left DC.ConvertError
@@ -289,4 +290,4 @@ instance DC.Convertible HSV.SqlValue P where
 charChk :: Char -> PersistValue
 charChk '\0' = PersistBool False
 charChk '\1' = PersistBool True
-charChk c = PersistText $ T.singleton c
+charChk c    = PersistText $ T.singleton c

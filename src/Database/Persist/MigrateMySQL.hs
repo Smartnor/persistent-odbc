@@ -1,35 +1,35 @@
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies      #-}
 -- | A MySQL backend for @persistent@.
 module Database.Persist.MigrateMySQL
-    ( getMigrationStrategy 
+    ( getMigrationStrategy
     ) where
 
-import Control.Arrow
-import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except (runExceptT)
-import Control.Monad.Trans.Resource (runResourceT)
-import Data.ByteString (ByteString)
-import Data.Either (partitionEithers)
-import Data.Function (on)
-import Data.List (find, intercalate, sort, groupBy)
-import Data.Text (Text, pack)
-import Data.Monoid ((<>))
+import           Control.Arrow
+import           Control.Monad.IO.Class       (MonadIO (..))
+import           Control.Monad.Trans.Class    (lift)
+import           Control.Monad.Trans.Except   (runExceptT)
+import           Control.Monad.Trans.Resource (runResourceT)
+import           Data.ByteString              (ByteString)
+import           Data.Either                  (partitionEithers)
+import           Data.Function                (on)
+import           Data.List                    (find, groupBy, intercalate, sort)
+import           Data.Monoid                  ((<>))
+import           Data.Text                    (Text, pack)
 
-import Data.Conduit
-import qualified Data.Conduit.List as CL
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import           Data.Conduit
+import qualified Data.Conduit.List            as CL
+import qualified Data.Text                    as T
+import qualified Data.Text.Encoding           as T
 
-import Database.Persist.Sql
-import Database.Persist.ODBCTypes
-import Data.Acquire (with)
+import           Data.Acquire                 (with)
+import           Database.Persist.ODBCTypes
+import           Database.Persist.Sql
 
 #if DEBUG
-import Debug.Trace
+import           Debug.Trace
 tracex::String -> a -> a
 tracex = trace
 #else
@@ -39,12 +39,12 @@ tracex _ b = b
 
 
 getMigrationStrategy :: DBType -> MigrationStrategy
-getMigrationStrategy dbtype@MySQL {} = 
+getMigrationStrategy dbtype@MySQL {} =
      MigrationStrategy
-                          { dbmsLimitOffset=decorateSQLWithLimitOffset "LIMIT 18446744073709551615" 
+                          { dbmsLimitOffset=decorateSQLWithLimitOffset "LIMIT 18446744073709551615"
                            ,dbmsMigrate=migrate'
                            ,dbmsInsertSql=insertSql'
-                           ,dbmsEscape=T.pack . escapeDBName 
+                           ,dbmsEscape=T.pack . escapeDBName
                            ,dbmsType=dbtype
                           }
 getMigrationStrategy dbtype = error $ "MySQL: calling with invalid dbtype " ++ show dbtype
@@ -61,7 +61,7 @@ migrate' allDefs getter val = do
     let (newcols, udefs, fdefs) = mkColumns allDefs val
     liftIO $ putStrLn $ "\n\nold="++show old
     liftIO $ putStrLn $ "\n\nfdefs="++show fdefs
-    
+
     let udspair = map udToPair udefs
     case (idClmn, old, partitionEithers old) of
       -- Nothing found, create everything
@@ -86,18 +86,18 @@ migrate' allDefs getter val = do
                         map (findTypeOfColumn allDefs name) ucols ]
         let foreigns = tracex ("in migrate' newcols=" ++ show newcols) $ do
               Column { cName=cname, cReference=Just (refTblName, a) } <- newcols
-              tracex ("\n\n111foreigns cname="++show cname++" name="++show name++" refTblName="++show refTblName++" a="++show a) $ 
+              tracex ("\n\n111foreigns cname="++show cname++" name="++show name++" refTblName="++show refTblName++" a="++show a) $
                return $ AlterColumn name (refTblName, addReference allDefs (refName name cname) refTblName cname)
-                 
-        let foreignsAlt = map (\fdef -> let (childfields, parentfields) = unzip (map (\((_,b),(_,d)) -> (b,d)) (foreignFields fdef)) 
+
+        let foreignsAlt = map (\fdef -> let (childfields, parentfields) = unzip (map (\((_,b),(_,d)) -> (b,d)) (foreignFields fdef))
                                         in AlterColumn name (foreignRefTableDBName fdef, AddReference (foreignRefTableDBName fdef) (foreignConstraintNameDBName fdef) childfields parentfields)) fdefs
-        
+
         return $ Right $ map showAlterDb $ addTable : uniques ++ foreigns ++ foreignsAlt
       -- No errors and something found, migrate
       (_, _, ([], old')) -> do
         let excludeForeignKeys (xs,ys) = (map (\c -> case cReference c of
                                                     Just (_,fk) -> case find (\f -> fk == foreignConstraintNameDBName f) fdefs of
-                                                                     Just _ -> tracex ("\n\n\nremoving cos a composite fk="++show fk) $ 
+                                                                     Just _ -> tracex ("\n\n\nremoving cos a composite fk="++show fk) $
                                                                                 c { cReference = Nothing }
                                                                      Nothing -> c
                                                     Nothing -> c) xs,ys)
@@ -123,8 +123,8 @@ findTypeOfColumn allDefs name col =
 
 -- | Helper for 'AddRefence' that finds out the 'entityId'.
 addReference :: [EntityDef] -> DBName -> DBName -> DBName -> AlterColumn
-addReference allDefs fkeyname reftable cname = tracex ("\n\naddreference cname="++show cname++" fkeyname="++show fkeyname++" reftable="++show reftable++" id_="++show id_) $ 
-                                  AddReference reftable fkeyname [cname] [id_] 
+addReference allDefs fkeyname reftable cname = tracex ("\n\naddreference cname="++show cname++" fkeyname="++show fkeyname++" reftable="++show reftable++" id_="++show id_) $
+                                  AddReference reftable fkeyname [cname] [id_]
     where
       id_ = maybe (error $ "Could not find ID of entity " ++ show reftable
                          ++ " (allDefs = " ++ show allDefs ++ ")")
@@ -166,7 +166,7 @@ getColumns :: (Text -> IO Statement)
                  )
 getColumns getter def = do
     -- Find out ID column.
-    stmtIdClmn <- getter $ T.concat $ 
+    stmtIdClmn <- getter $ T.concat $
       ["SELECT COLUMN_NAME, "
       ,"IS_NULLABLE, "
       ,"DATA_TYPE, "
@@ -175,11 +175,11 @@ getColumns getter def = do
       ,"WHERE  table_schema=schema() "
       ,"AND TABLE_NAME   = ? "
       ,"AND COLUMN_NAME  = ?"]
-    inter1 <- with (stmtQuery stmtIdClmn vals) ($$ CL.consume)
-    ids <- runResourceT $ CL.sourceList inter1 $$ helperClmns -- avoid nested queries
+    inter1 <- with (stmtQuery stmtIdClmn vals) $ \r -> runConduit (r .| CL.consume)
+    ids <- runResourceT $ runConduit (CL.sourceList inter1 .| helperClmns) -- avoid nested queries
 
     -- Find out all columns.
-    stmtClmns <- getter $ T.concat $ 
+    stmtClmns <- getter $ T.concat $
       ["SELECT COLUMN_NAME, "
       ,"IS_NULLABLE, "
       ,"DATA_TYPE, "
@@ -188,11 +188,11 @@ getColumns getter def = do
       ,"WHERE  table_schema=schema() "
       ,"AND TABLE_NAME   = ? "
       ,"AND COLUMN_NAME <> ?"]
-    inter2 <- with (stmtQuery stmtClmns vals) ($$ CL.consume)
-    cs <- runResourceT $ CL.sourceList inter2 $$ helperClmns -- avoid nested queries
+    inter2 <- with (stmtQuery stmtClmns vals) $ \r -> runConduit (r .| CL.consume)
+    cs <- runResourceT $ runConduit (CL.sourceList inter2 .| helperClmns) -- avoid nested queries
 
     -- Find out the constraints.
-    stmtCntrs <- getter $ T.concat $ 
+    stmtCntrs <- getter $ T.concat $
       ["SELECT CONSTRAINT_NAME, "
       ,"COLUMN_NAME "
       ,"FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE "
@@ -203,7 +203,7 @@ getColumns getter def = do
       ,"AND REFERENCED_TABLE_SCHEMA IS NULL "
       ,"ORDER BY CONSTRAINT_NAME, "
       ,"COLUMN_NAME"]
-    us <- with (stmtQuery stmtCntrs vals) ($$ helperCntrs)
+    us <- with (stmtQuery stmtCntrs vals) $ \r -> runConduit (r .| helperCntrs)
     liftIO $ putStrLn $ "\n\ngetColumns cs="++show cs++"\n\nus="++show us
     -- Return both
     return (ids, cs ++ us)
@@ -211,7 +211,7 @@ getColumns getter def = do
     vals = [ PersistText $ unDBName $ entityDB def
            , PersistText $ unDBName $ fieldDB $ entityId def ]
 
-    helperClmns = CL.mapM getIt =$ CL.consume
+    helperClmns = CL.mapM getIt .| CL.consume
         where
           getIt = fmap (either Left (Right . Left)) .
                   liftIO .
@@ -254,7 +254,7 @@ getColumn getter tname [ PersistByteString cname
       type_ <- parseType type'
 
       -- Foreign key (if any)
-      stmt <- lift $ getter $ T.concat $ 
+      stmt <- lift $ getter $ T.concat $
         ["SELECT REFERENCED_TABLE_NAME, "
         ,"CONSTRAINT_NAME, "
         ,"ORDINAL_POSITION "
@@ -269,11 +269,11 @@ getColumn getter tname [ PersistByteString cname
       let vars = [ PersistText $ unDBName tname
                  , PersistByteString cname
                  ]
-      cntrs <- lift $ with (stmtQuery stmt vars) ($$ CL.consume)
+      cntrs <- lift $ with (stmtQuery stmt vars) $ \r -> runConduit (r .| CL.consume)
       ref <- case cntrs of
                [] -> return Nothing
                [[PersistByteString tab, PersistByteString ref, PersistInt64 pos]] ->
-                   tracex ("\n\n\nGBREF "++show (tab,ref,pos)++"\n\n") $ 
+                   tracex ("\n\n\nGBREF "++show (tab,ref,pos)++"\n\n") $
                     return $ Just (DBName $ T.decodeUtf8 tab, DBName $ T.decodeUtf8 ref)
                a1 -> fail $ "MySQL.getColumn/getRef: never here error[" ++ show a1 ++ "]"
 
@@ -381,17 +381,17 @@ findAlters tblName allDefs col@(Column name isNull type_ def defConstraintName _
       case filter ((name ==) . cName) cols of
         [] -> case ref of
                Nothing -> ([(name, Add' col)], [])
-               Just (tname, b) -> let cnstr = tracex ("\n\ncols="++show cols++"\n\n2222findalters new foreignkey col["++showColumn col++"] name["++show name++"] tname["++show tname++"] b["++show b ++ "]") $ 
+               Just (tname, b) -> let cnstr = tracex ("\n\ncols="++show cols++"\n\n2222findalters new foreignkey col["++showColumn col++"] name["++show name++"] tname["++show tname++"] b["++show b ++ "]") $
                                               [addReference allDefs (refName tblName name) tname name]
                                   in (map ((,) name) (Add' col : cnstr), cols)
         Column _ isNull' type_' def' defConstraintName' _maxLen' ref':_ ->
             let -- Foreign key
                 refDrop = case (ref == ref', ref') of
-                            (False, Just (_, cname)) -> tracex ("\n\n44444findalters dropping foreignkey cname[" ++ show cname ++ "] ref[" ++ show ref ++"]") $ 
+                            (False, Just (_, cname)) -> tracex ("\n\n44444findalters dropping foreignkey cname[" ++ show cname ++ "] ref[" ++ show ref ++"]") $
                                                         [(name, DropReference cname)]
                             _ -> []
                 refAdd  = case (ref == ref', ref) of
-                            (False, Just (tname, cname)) -> tracex ("\n\n33333 findalters foreignkey has changed cname["++show cname++"] name["++show name++"] tname["++show tname++"] ref["++show ref++"] ref'["++show ref' ++ "]") $ 
+                            (False, Just (tname, cname)) -> tracex ("\n\n33333 findalters foreignkey has changed cname["++show cname++"] name["++show name++"] tname["++show tname++"] ref["++show ref++"] ref'["++show ref' ++ "]") $
                                                              [(tname, addReference allDefs (refName tblName name) tname name)]
                             _ -> []
                 -- Type and nullability
@@ -399,7 +399,7 @@ findAlters tblName allDefs col@(Column name isNull type_ def defConstraintName _
                         | otherwise = [(name, Change col)]
                 -- Default value
                 modDef | cmpdef def def' = []
-                       | otherwise   = tracex ("\n\nfindAlters modDef col=" ++ show col ++ " name=" ++ show name ++ " def=" ++ show def ++ " def'=" ++ show def' ++ " defConstraintName=" ++ show defConstraintName++" defConstraintName'=" ++ show defConstraintName' ++ "\n\n") $ 
+                       | otherwise   = tracex ("\n\nfindAlters modDef col=" ++ show col ++ " name=" ++ show name ++ " def=" ++ show def ++ " def'=" ++ show def' ++ " defConstraintName=" ++ show defConstraintName++" defConstraintName'=" ++ show defConstraintName' ++ "\n\n") $
                                        case def of
                                          Nothing -> [(name, NoDefault)]
                                          Just s -> [(name, Default $ T.unpack s)]
@@ -408,16 +408,16 @@ findAlters tblName allDefs col@(Column name isNull type_ def defConstraintName _
 
 
 cmpdef::Maybe Text -> Maybe Text -> Bool
-cmpdef Nothing Nothing = True
+cmpdef Nothing Nothing        = True
 cmpdef (Just def) (Just def') = def == "'" <> def' <> "'"
-cmpdef _ _ = False
+cmpdef _ _                    = False
 
 tpcheck :: SqlType -> SqlType -> Bool
-tpcheck SqlDayTime SqlString = True
-tpcheck SqlString SqlDayTime = True
+tpcheck SqlDayTime SqlString     = True
+tpcheck SqlString SqlDayTime     = True
 tpcheck (SqlNumeric _ _) SqlReal = True
 tpcheck SqlReal (SqlNumeric _ _) = True
-tpcheck a b = a==b
+tpcheck a b                      = a==b
 ----------------------------------------------------------------------
 
 
@@ -432,9 +432,9 @@ showColumn (Column n nu t def _defConstraintName maxLen ref) = concat
     , if nu then "NULL" else "NOT NULL"
     , case def of
         Nothing -> ""
-        Just s -> " DEFAULT " ++ T.unpack s
+        Just s  -> " DEFAULT " ++ T.unpack s
     , case ref of
-        Nothing -> ""
+        Nothing     -> ""
         Just (s, _) -> " REFERENCES " ++ escapeDBName s
     ]
 
@@ -447,7 +447,7 @@ showSqlType SqlBlob    Nothing    = "BLOB"
 showSqlType SqlBlob    (Just i)   = "VARBINARY(" ++ show i ++ ")"
 showSqlType SqlBool    _          = "TINYINT(1)"
 showSqlType SqlDay     _          = "DATE"
-showSqlType SqlDayTime _          = "DATETIME" -- "VARCHAR(50) CHARACTER SET utf8" 
+showSqlType SqlDayTime _          = "DATETIME" -- "VARCHAR(50) CHARACTER SET utf8"
 --showSqlType SqlDayTimeZoned _     = "VARCHAR(50) CHARACTER SET utf8"
 showSqlType SqlInt32   _          = "INT"
 showSqlType SqlInt64   _          = "BIGINT"
@@ -585,7 +585,7 @@ escapeDBName (DBName s) = '`' : go (T.unpack s)
 insertSql' :: EntityDef -> [PersistValue] -> InsertSqlResult
 insertSql' ent vals =
   case entityPrimary ent of
-    Just _pdef -> 
+    Just _pdef ->
       ISRManyKeys sql vals
         where sql = pack $ concat
                 [ "INSERT INTO "
