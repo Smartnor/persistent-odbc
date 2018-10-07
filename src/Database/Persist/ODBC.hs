@@ -35,7 +35,6 @@ import qualified Database.HDBC.SqlValue           as HSV
 
 import           Control.Monad                    (mzero)
 import           Control.Monad.IO.Class           (MonadIO (..))
-import           Control.Monad.Trans.Control      (MonadBaseControl)
 import           Control.Monad.Trans.Resource
 import           Data.Aeson
 import           Data.IORef                       (newIORef)
@@ -60,7 +59,7 @@ type ConnectionString = String
 -- finishes using it.  Note that you should not use the given
 -- 'ConnectionPool' outside the action since it may be already
 -- been released.
-withODBCPool :: (MonadBaseControl IO m, MonadLogger m, MonadUnliftIO m)
+withODBCPool :: (MonadLogger m, MonadUnliftIO m)
              => Maybe DBType
              -> ConnectionString
              -- ^ Connection string to the database.
@@ -78,7 +77,7 @@ withODBCPool dbt ci = withSqlPool (\lg -> open' lg dbt ci)
 -- responsibility to properly close the connection pool when
 -- unneeded.  Use 'withODBCPool' for an automatic resource
 -- control.
-createODBCPool :: (MonadLogger m, MonadUnliftIO m, MonadBaseControl IO m)
+createODBCPool :: (MonadLogger m, MonadUnliftIO m)
                => Maybe DBType
                -> ConnectionString
                -- ^ Connection string to the database.
@@ -90,7 +89,7 @@ createODBCPool dbt ci = createSqlPool (\lg -> open' lg dbt ci)
 
 -- | Same as 'withODBCPool', but instead of opening a pool
 -- of connections, only one connection is opened.
-withODBCConn :: (MonadLogger m, MonadUnliftIO  m, MonadBaseControl IO m)
+withODBCConn :: (MonadLogger m, MonadUnliftIO  m)
              => Maybe DBType -> ConnectionString -> (SqlBackend -> m a) -> m a
 withODBCConn dbt cs = withSqlConn (\lg -> open' lg dbt cs)
 
@@ -180,7 +179,7 @@ execute' query vals = fmap fromInteger $ O.execute query $ map (HSV.toSql . P) v
 withStmt' :: MonadIO m
           => O.Statement
           -> [PersistValue]
-          -> Acquire (ConduitT () [PersistValue] m ()) 
+          -> Acquire (ConduitT () [PersistValue] m ())
 withStmt' stmt vals = do
 #if DEBUG
     liftIO $ putStrLn $ "withStmt': vals: " ++ show vals

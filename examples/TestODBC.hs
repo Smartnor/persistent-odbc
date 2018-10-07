@@ -1,59 +1,67 @@
-{-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, OverloadedStrings #-}
-{-# LANGUAGE GADTs, FlexibleContexts #-}
-{-# LANGUAGE EmptyDataDecls    #-}
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE EmptyDataDecls             #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
 module TestODBC where
 
-import Database.Persist
-import Database.Persist.ODBC
-import Database.Persist.TH
-import Control.Monad.Trans.Reader (ask)
-import Control.Monad.Trans.Resource (runResourceT,MonadResource,ResourceT)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger
-import Data.Text (Text)
-import qualified Data.Text as T
+import           Control.Monad.IO.Class       (liftIO)
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Reader   (ask)
+import           Control.Monad.Trans.Resource (MonadResource, ResourceT,
+                                               runResourceT)
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import           Database.Persist
+import           Database.Persist.ODBC
+import           Database.Persist.TH
 
-import Data.Time (getCurrentTime,UTCTime)
+import           Data.Time                    (UTCTime, getCurrentTime)
 
-import System.Environment (getArgs)
-import Employment
-import Data.Conduit
-import qualified Data.Conduit.List as CL
-import Control.Monad (when,unless)
-import qualified Database.HDBC as H
-import qualified Database.HDBC.ODBC as H
+import           Control.Monad                (unless, when)
+import           Data.Conduit
+import qualified Data.Conduit.List            as CL
+import qualified Database.HDBC                as H
+import qualified Database.HDBC.ODBC           as H
+import           Employment
+import           System.Environment           (getArgs)
 
-import FtypeEnum
-import qualified Database.Esqueleto as E
-import Database.Esqueleto (select,where_,(^.),from,Value(..))
+import           Database.Esqueleto           (Value (..), from, select, where_,
+                                               (^.))
+import qualified Database.Esqueleto           as E
+import           FtypeEnum
 
-import Data.ByteString (ByteString)
-import Data.Ratio
-import Text.Blaze.Html
+import           Data.ByteString              (ByteString)
+import           Data.Ratio
+import           Text.Blaze.Html
 --import Debug.Trace
 
-share [mkPersist sqlSettings, mkMigrate "migrateAll", mkDeleteCascade sqlOnlySettings] [persistLowerCase|
-Test0 
+share [mkPersist sqlSettings, mkMigrate "migrateAll", mkDeleteCascade sqlSettings] [persistLowerCase|
+Test0
     mybool Bool
     deriving Show
-Test1 
+Test1
     flag Bool
     flag1 Bool Maybe
-    dbl Double 
+    dbl Double
     db2 Double Maybe
     deriving Show
-    
+
 Test2
     dt UTCTime
     deriving Show
-    
+
 Persony
     name String
     employment Employment
     deriving Show
-    
+
 Personx
     name String Eq Ne Desc
     age Int Lt Asc
@@ -64,7 +72,7 @@ Personx
 Testnum
     bar Int
     znork Int Maybe
-    znork1 String 
+    znork1 String
     znork2 String Maybe
     znork3 UTCTime
     name String Maybe
@@ -87,7 +95,7 @@ Asm
   Unique MyUniqueAsm name
 --  deriving Typeable
   deriving Show
-  
+
 Xsd
   name String
   description String
@@ -95,7 +103,7 @@ Xsd
   Unique MyUniqueXsd name -- global
 --  deriving Typeable
   deriving Show
-  
+
 Ftype
   name String
   Unique MyUniqueFtype name
@@ -109,10 +117,10 @@ Line
   ftypeid FtypeEnum
   xsdid XsdId
   Unique EinzigName xsdid name  -- within an xsd:so can repeat fieldnames in different xsds
-  Unique EinzigPos xsdid pos   
+  Unique EinzigPos xsdid pos
 --  deriving Typeable
   deriving Show
-  
+
 
 Interface
   name String
@@ -125,25 +133,25 @@ Interface
 
 Testother -- json -- no FromJSON instance in aeson anymore for bytestring
   bs1 ByteString Maybe
-  bs2 ByteString 
+  bs2 ByteString
   deriving Show
 
 Testrational json
   rat Rational
   deriving Show
 
-Testhtml 
+Testhtml
   myhtml Html
   -- deriving Show
 
-Testblob 
+Testblob
   bs1 ByteString Maybe
   deriving Show
 
-Testblob3 
-  bs1 ByteString 
-  bs2 ByteString 
-  bs3 ByteString 
+Testblob3
+  bs1 ByteString
+  bs2 ByteString
+  bs3 ByteString
   deriving Show
 
 Testlen
@@ -173,7 +181,7 @@ Both
 main :: IO ()
 main = do
   [arg] <- getArgs
-  let (dbtype',dsn) = 
+  let (dbtype',dsn) =
        case arg of -- odbc system dsn
            "d" -> (DB2,"dsn=db2_test")
            "p" -> (Postgres,"dsn=pg_test")
@@ -181,7 +189,7 @@ main = do
 -- have to pass UID=..; PWD=..; or use Trusted_Connection or Trusted Connection depending on the driver and environment
            "s" -> (MSSQL True,"dsn=mssql_test; Trusted_Connection=True") -- mssql 2012 [full limit and offset support]
            "so" -> (MSSQL False,"dsn=mssql_test; Trusted_Connection=True") -- mssql pre 2012 [limit support only]
-           "o" -> (Oracle False,"dsn=oracle_test") -- pre oracle 12c [no support for limit and offset] 
+           "o" -> (Oracle False,"dsn=oracle_test") -- pre oracle 12c [no support for limit and offset]
            "on" -> (Oracle True,"dsn=oracle_test") -- >= oracle 12c [full limit and offset support]
            "q" -> (Sqlite False,"dsn=sqlite_test")
            "qn" -> (Sqlite True,"dsn=sqlite_test")
@@ -194,7 +202,7 @@ main = do
     liftIO $ putStrLn "\nbefore migration\n"
     runMigration migrateAll
     liftIO $ putStrLn "after migration"
-    case dbtype of 
+    case dbtype of
       MSSQL {} -> do -- deleteCascadeWhere Asm causes seg fault for mssql only
           deleteWhere ([]::[Filter Line])
           deleteWhere ([]::[Filter Xsd])
@@ -219,9 +227,9 @@ main = do
     deleteWhere ([]::[Filter Testlen])
 
     when True $ testbase dbtype
- 
+
 testbase :: DBType -> SqlPersistT (NoLoggingT (ResourceT IO)) ()
-testbase dbtype = do    
+testbase dbtype = do
     liftIO $ putStrLn "\n*** in testbase\n"
     a1 <- insert $ Foo "test"
     liftIO $ putStrLn $ "a1=" ++ show a1
@@ -258,8 +266,8 @@ testbase dbtype = do
     deleteWhere [BlogPostRefPersonz ==. johnId]
     test0
     test1 dbtype
-    test2 
-    test3 
+    test2
+    test3
     test4
     test5 dbtype
     test6
@@ -267,11 +275,11 @@ testbase dbtype = do
     when (limitoffset dbtype) test8
     case dbtype of
       Oracle { oracle12c=False } -> return ()
-      _ -> test9
+      _                          -> test9
     test10 dbtype
     test11 dbtype
     test12 dbtype
-    
+
 test0::SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test0 = do
     liftIO $ putStrLn "\n*** in test0\n"
@@ -312,9 +320,9 @@ test0 = do
     _ <- insert $ Personx "Abe1" 31 $ Just "brown"
     p9 <- selectList [PersonxName ==. "Abe1"] []
     liftIO $ print p9
-    
+
     aa <- selectList ([]::[Filter Personx]) []
-    unless (length aa == 4) $ error $ "wrong number of Personx rows " ++ show aa    
+    unless (length aa == 4) $ error $ "wrong number of Personx rows " ++ show aa
 
     p10 <- getBy $ PersonxNameKey "Michael"
     liftIO $ print p10
@@ -332,7 +340,7 @@ test0 = do
     plast <- get pid
     liftIO $ print plast
 
-test1::DBType -> SqlPersistT (NoLoggingT (ResourceT IO)) ()    
+test1::DBType -> SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test1 dbtype = do
     liftIO $ putStrLn "\n*** in test1\n"
     pid <- insert $ Persony "Dude" Retired
@@ -347,23 +355,23 @@ test1 dbtype = do
     aa <- selectList ([]::[Filter Persony]) []
     unless (length aa == 4) $ error $ "wrong number of Personz rows " ++ show aa
     liftIO $ putStrLn $ "persony " ++ show aa
-    let sql = case dbtype of 
+    let sql = case dbtype of
                 MSSQL {} -> "SELECT [name] FROM [persony] WHERE [name] LIKE '%Snoyman%'"
                 MySQL {} -> "SELECT `name` FROM `persony` WHERE `name` LIKE '%Snoyman%'"
                 _        -> "SELECT \"name\" FROM \"persony\" WHERE \"name\" LIKE '%Snoyman%'"
-    rawQuery sql [] $$ CL.mapM_ (liftIO . print)
-    
+    runConduit $ rawQuery sql [] .| CL.mapM_ (liftIO . print)
+
 test2::SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test2 = do
     liftIO $ putStrLn "\n*** in test2\n"
-    aaa <- insert $ Test0 False 
+    aaa <- insert $ Test0 False
     liftIO $ print aaa
 
     aa <- selectList ([]::[Filter Test0]) []
     unless (length aa == 1) $ error $ "wrong number of Personz rows " ++ show aa
-        
+
 test3::SqlPersistT (NoLoggingT (ResourceT IO)) ()
-test3 = do    
+test3 = do
     liftIO $ putStrLn "\n*** in test3\n"
     a1 <- insert $ Test1 True (Just False) 100.3 Nothing
     liftIO $ putStrLn $ "a1=" ++ show a1
@@ -373,7 +381,7 @@ test3 = do
     liftIO $ putStrLn $ "a3=" ++ show a3
     a4 <- insert $ Test1 False Nothing 100.3 Nothing
     liftIO $ putStrLn $ "a4=" ++ show a4
-    ret <- selectList ([]::[Filter Test1]) [] 
+    ret <- selectList ([]::[Filter Test1]) []
     liftIO $ putStrLn $ "ret=" ++ show ret
 
     aa <- selectList ([]::[Filter Test1]) []
@@ -382,7 +390,7 @@ test3 = do
 test4::SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test4 = do
     liftIO $ putStrLn "\n*** in test4\n"
-    a1 <- insert $ Asm "NewAsm1" "description for newasm1" 
+    a1 <- insert $ Asm "NewAsm1" "description for newasm1"
 
     x11 <- insert $ Xsd "NewXsd11" "description for newxsd11" a1
     l111 <- insert $ Line "NewLine111" "description for newline111" 10 Xsd_string x11
@@ -397,9 +405,9 @@ test4 = do
     l124 <- insert $ Line "NewLine124" "description for newline4" 99 Xsd_double x12
     l125 <- insert $ Line "NewLine125" "description for newline5" 2 Xsd_boolean x12
 
-    a2 <- insert $ Asm "NewAsm2" "description for newasm2" 
+    a2 <- insert $ Asm "NewAsm2" "description for newasm2"
 
-    a3 <- insert $ Asm "NewAsm3" "description for newasm3" 
+    a3 <- insert $ Asm "NewAsm3" "description for newasm3"
     x31 <- insert $ Xsd "NewXsd31" "description for newxsd311" a3
 
     aa <- selectList ([]::[Filter Asm]) []
@@ -410,43 +418,43 @@ test4 = do
     unless (length aa == 9) $ error $ "wrong number of Line rows " ++ show aa
 
 
-    [Value mpos] <- select $ 
+    [Value mpos] <- select $
                        from $ \ln -> do
                           where_ (ln ^. LineXsdid E.==. E.val x11)
                           return $ E.joinV $ E.max_ (E.just (ln ^. LinePos))
-    liftIO $ putStrLn $ "mpos=" ++ show mpos                          
+    liftIO $ putStrLn $ "mpos=" ++ show mpos
 
 test5::DBType -> SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test5 dbtype = do
     liftIO $ putStrLn "\n*** in test5\n"
-    a1 <- insert $ Testother (Just "abc") "zzzz" 
-    case dbtype of 
+    a1 <- insert $ Testother (Just "abc") "zzzz"
+    case dbtype of
       MSSQL {} -> liftIO $ putStrLn $ show dbtype ++ " insert multiple blob fields with a null fails"
       DB2 {} -> liftIO $ putStrLn $ show dbtype ++ " insert multiple blob fields with a null fails"
       _ -> do
-              a2 <- insert $ Testother Nothing "aaa" 
+              a2 <- insert $ Testother Nothing "aaa"
               liftIO $ putStrLn $ "a2=" ++ show a2
-    a3 <- insert $ Testother (Just "nnn") "bbb" 
-    a4 <- insert $ Testother (Just "ddd") "mmm" 
-    xs <- case dbtype of 
+    a3 <- insert $ Testother (Just "nnn") "bbb"
+    a4 <- insert $ Testother (Just "ddd") "mmm"
+    xs <- case dbtype of
             Oracle {} -> selectList ([]::[Filter Testother]) [] -- cannot sort blobs in oracle
-            DB2 {} -> selectList ([]::[Filter Testother]) [] -- cannot sort blobs in db2?
-            _ -> selectList [] [Desc TestotherBs1] 
+            DB2 {}    -> selectList ([]::[Filter Testother]) [] -- cannot sort blobs in db2?
+            _         -> selectList [] [Desc TestotherBs1]
     liftIO $ putStrLn $ "xs=" ++ show xs
-    case dbtype of 
+    case dbtype of
       Oracle {} -> return ()
       DB2 {} -> return ()
       _ -> do
-              ys <- selectList [] [Desc TestotherBs2] 
+              ys <- selectList [] [Desc TestotherBs2]
               liftIO $ putStrLn $ "ys=" ++ show ys
-    
+
     aa <- selectList ([]::[Filter Testother]) []
     case dbtype of
       MSSQL {} -> unless (length aa == 3) $ error $ show dbtype ++ " :wrong number of Testother rows " ++ show aa
       DB2 {} -> unless (length aa == 3) $ error $ show dbtype ++ " :wrong number of Testother rows " ++ show aa
       _ -> unless (length aa == 4) $ error $ "wrong number of Testother rows " ++ show aa
-      
-    
+
+
 test6::SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test6  = do
     liftIO $ putStrLn "\n*** in test6\n"
@@ -454,7 +462,7 @@ test6  = do
     r2 <- insert $ Testrational (13 % 14)
     liftIO $ putStrLn $ "r1=" ++ show r1
     liftIO $ putStrLn $ "r2=" ++ show r2
-    zs <- selectList [] [Desc TestrationalRat] 
+    zs <- selectList [] [Desc TestrationalRat]
     liftIO $ putStrLn $ "zs=" ++ show zs
     h1 <- insert $ Testhtml $ preEscapedToMarkup ("<p>hello</p>"::String)
     liftIO $ putStrLn $ "h1=" ++ show h1
@@ -463,22 +471,22 @@ test6  = do
     unless (length aa == 2) $ error $ "wrong number of Testrational rows " ++ show aa
 
     aa <- selectList ([]::[Filter Testhtml]) []
-    unless (length aa == 1) $ error $ "wrong number of Testhtml rows " 
-    
+    unless (length aa == 1) $ error $ "wrong number of Testhtml rows "
+
 test7::SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test7 = do
     liftIO $ putStrLn "\n*** in test7\n"
-    xs <- selectList [] [Desc LinePos, LimitTo 2, OffsetBy 3] 
+    xs <- selectList [] [Desc LinePos, LimitTo 2, OffsetBy 3]
     liftIO $ putStrLn $ show (length xs) ++ " rows: limit=2,offset=3 xs=" ++ show xs
-    xs <- selectList [] [Desc LinePos, LimitTo 2] 
+    xs <- selectList [] [Desc LinePos, LimitTo 2]
     liftIO $ putStrLn $ show (length xs) ++ " rows: limit=2 xs=" ++ show xs
-    xs <- selectList [] [Desc LinePos, OffsetBy 3] 
+    xs <- selectList [] [Desc LinePos, OffsetBy 3]
     liftIO $ putStrLn $ show (length xs) ++ " rows: offset=3 xs=" ++ show xs
 
 test8::SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test8 = do
     liftIO $ putStrLn "\n*** in test8\n"
-    xs <- select $ 
+    xs <- select $
              from $ \ln -> do
                 where_ (ln ^. LinePos E.>=. E.val 0)
                 E.orderBy [E.asc (ln ^. LinePos)]
@@ -490,26 +498,26 @@ test8 = do
 test9::SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test9 = do
     liftIO $ putStrLn "\n*** in test9\n"
-    xs <- selectList [] [Desc LinePos, LimitTo 2] 
+    xs <- selectList [] [Desc LinePos, LimitTo 2]
     liftIO $ putStrLn $ show (length xs) ++ " rows: limit=2,offset=0 xs=" ++ show xs
-    xs <- selectList [] [Desc LinePos, LimitTo 4] 
+    xs <- selectList [] [Desc LinePos, LimitTo 4]
     liftIO $ putStrLn $ show (length xs) ++ " rows: limit=4,offset=0 xs=" ++ show xs
 
 test10::DBType -> SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test10 dbtype = do
     liftIO $ putStrLn "\n*** in test10\n"
-    a1 <- insert $ Testblob3 "abc1" "def1" "zzzz1" 
-    a2 <- insert $ Testblob3 "abc2" "def2" "test2" 
-    case dbtype of 
+    a1 <- insert $ Testblob3 "abc1" "def1" "zzzz1"
+    a2 <- insert $ Testblob3 "abc2" "def2" "test2"
+    case dbtype of
       Oracle {} -> liftIO $ putStrLn "skipping insert empty string into oracle blob column (treated as a null)"
         {-
-        *** Exception: SqlError {seState = "[\"HY000\"]", seNativeError = -1, 
+        *** Exception: SqlError {seState = "[\"HY000\"]", seNativeError = -1,
         seErrorMsg = "execute execute: [\"1400: [Oracle][ODBC][Ora]ORA-01400: cannot insert NULL into (\\\"SYSTEM\\\".\\\"testblob3\\\".\\\"bs1\\\")\\n\"]"}
         -}
       _ -> do
-             a3 <- insert $ Testblob3 "" "hello3" "world3" 
+             a3 <- insert $ Testblob3 "" "hello3" "world3"
              return ()
-    ys <- selectList ([]::[Filter Testblob3]) [] 
+    ys <- selectList ([]::[Filter Testblob3]) []
     liftIO $ putStrLn $ "ys=" ++ show ys
 
     aa <- selectList ([]::[Filter Testblob3]) []
@@ -520,11 +528,11 @@ test10 dbtype = do
 test11::DBType -> SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test11 dbtype = do
     liftIO $ putStrLn "\n*** in test11\n"
-    case dbtype of 
+    case dbtype of
        MSSQL {} -> liftIO $ putStrLn $ show dbtype ++ ":inserting null in a blob not supported so skipping"
        DB2 {} -> liftIO $ putStrLn $ show dbtype ++ ":inserting null in a blob not supported so skipping"
        _ -> do
-              _ <- insert $ Testblob Nothing  
+              _ <- insert $ Testblob Nothing
               return ()
     _ <- insert $ Testblob $ Just "some data for testing"
     _ <- insert $ Testblob $ Just "world"
@@ -542,8 +550,8 @@ test11 dbtype = do
 test12::DBType -> SqlPersistT (NoLoggingT (ResourceT IO)) ()
 test12 dbtype = do
     liftIO $ putStrLn "\n*** in test12\n"
-    a1 <- insert $ Testlen "txt1" "str1" "bs1" (Just "txt1m") (Just "str1m") (Just "bs1m")     
-    a2 <- insert $ Testlen "txt2" "str2" "bs2" (Just "aaaa") (Just "str2m") (Just "bs2m")     
+    a1 <- insert $ Testlen "txt1" "str1" "bs1" (Just "txt1m") (Just "str1m") (Just "bs1m")
+    a2 <- insert $ Testlen "txt2" "str2" "bs2" (Just "aaaa") (Just "str2m") (Just "bs2m")
 
     aa <- selectList ([]::[Filter Testlen]) []
     case dbtype of
@@ -554,11 +562,11 @@ test12 dbtype = do
 
 limitoffset :: DBType -> Bool
 limitoffset dbtype = -- trace ("limitoffset dbtype=" ++ show dbtype) $
-  case dbtype of 
+  case dbtype of
     Oracle False -> False
-    MSSQL False -> False
-    _ -> True
-    
+    MSSQL False  -> False
+    _            -> True
+
 main2::IO ()
 main2 = do
 --  let connectionString = "dsn=mssql_test; Trusted_Connection=True"
@@ -567,7 +575,7 @@ main2 = do
   putStrLn "\n1\n"
   stmt1 <- H.prepare conn "select * from test93"
   putStrLn "\n2\n"
-  vals <- H.execute stmt1 [] 
+  vals <- H.execute stmt1 []
   putStrLn "\n3\n"
   results <- H.fetchAllRowsAL stmt1
   putStrLn "\n4\n"
@@ -576,43 +584,43 @@ main2 = do
   putStrLn "\na\n"
   --stmt1 <- H.prepare conn "create table test93 (bs1 blob)"
   --putStrLn "\nb\n"
-  --vals <- H.execute stmt1 [] 
+  --vals <- H.execute stmt1 []
   --putStrLn "\nc\n"
   stmt1 <- H.prepare conn "insert into test93 values(blob(?))"
   putStrLn "\nd\n"
-  vals <- H.execute stmt1 [H.SqlByteString "hello world"] 
+  vals <- H.execute stmt1 [H.SqlByteString "hello world"]
   putStrLn "\ne\n"
---  _ <- H.commit conn 
+--  _ <- H.commit conn
 --  error "we are done!!"
 
-  
+
 --  a <- H.quickQuery' conn "select * from testblob" []  -- hangs here in both mssql drivers [not all the time]
 --  putStrLn $ "\n5\n"
 --  print a
 
-  stmt <- H.prepare conn "insert into testblob (bs1) values(?)" 
+  stmt <- H.prepare conn "insert into testblob (bs1) values(?)"
   putStrLn "\n6\n"
-  vals <- H.execute stmt [H.SqlNull] 
+  vals <- H.execute stmt [H.SqlNull]
   putStrLn "\n7\n"
-  vals <- H.execute stmt [H.SqlNull] 
+  vals <- H.execute stmt [H.SqlNull]
   putStrLn "\n8\n"
-  vals <- H.execute stmt [H.SqlNull] 
+  vals <- H.execute stmt [H.SqlNull]
   putStrLn "\n9\n"
-  
+
   results <- H.fetchAllRowsAL stmt1
   mapM_ print results
   putStrLn "\nTESTBLOB worked\n"
 
-  --stmt <- H.prepare conn "insert into testother (bs1,bs2) values(convert(varbinary(max),?),convert(varbinary(max),?))" 
+  --stmt <- H.prepare conn "insert into testother (bs1,bs2) values(convert(varbinary(max),?),convert(varbinary(max),?))"
   stmt <- H.prepare conn "insert into testother (bs1,bs2) values(convert(varbinary(max), cast (? as varchar(100))),convert(varbinary(max), cast (? as varchar(100))))"
-  vals <- H.execute stmt [H.SqlByteString "hello",H.SqlByteString "test"] 
+  vals <- H.execute stmt [H.SqlByteString "hello",H.SqlByteString "test"]
 
-  --vals <- H.execute stmt [H.SqlNull,H.SqlByteString "test"] 
+  --vals <- H.execute stmt [H.SqlNull,H.SqlByteString "test"]
   putStrLn "\nTESTOTHER worked\n"
 
   H.commit conn
   print vals
-        
+
 
 main3::IO ()
 main3 = do
@@ -644,7 +652,7 @@ main3 = do
   results <- H.fetchAllRowsAL' stmt
   mapM_ print results
   H.commit conn
-  
+
 main4::IO ()
 main4 = do
   --let connectionString = "dsn=pg_test"
@@ -662,7 +670,7 @@ main4 = do
   stmt <- H.prepare conn "insert into fred values(?)"
   a <- H.execute stmt [H.SqlString "hello"]
   print a
-  
+
   putStrLn "\nbefore select\n"
   stmt <- H.prepare conn "select nm,length(nm) from fred"
   vals <- H.execute stmt []
@@ -680,9 +688,9 @@ main4 = do
   results <- H.fetchAllRowsAL' stmt
   putStrLn "select after update"
   print results
-  
+
   H.commit conn
-  
+
 {-
 drivername=odbc
 clientver=03.80.0000

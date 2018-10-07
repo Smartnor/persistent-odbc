@@ -1,39 +1,47 @@
-{-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, OverloadedStrings #-}
-{-# LANGUAGE GADTs, FlexibleContexts #-}
-{-# LANGUAGE EmptyDataDecls    #-}
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables, GeneralizedNewtypeDeriving, DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE EmptyDataDecls             #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
 module Test1 where
 
-import qualified Database.Persist as P
-import Database.Persist.TH
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger
-import Control.Monad.Trans.Resource (runResourceT,MonadResource)
-import Control.Monad.Trans.Reader (ask)
-import Data.Text (Text)
-import qualified Data.Text as T
-import Database.Persist.ODBC
+import           Control.Monad.IO.Class       (liftIO)
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Reader   (ask)
+import           Control.Monad.Trans.Resource (MonadResource, runResourceT)
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import qualified Database.Persist             as P
+import           Database.Persist.ODBC
+import           Database.Persist.TH
 --import Data.Conduit
-import Data.Aeson
-import System.Environment (getArgs)
+import           Data.Aeson
+import           System.Environment           (getArgs)
 
-import qualified Database.Esqueleto as E
-import Database.Esqueleto (select,where_,(^.),from,Value(..))
-import Control.Applicative ((<$>),(<*>))
-import Data.Int
-import Debug.Trace
-import Control.Monad (when)
+import           Control.Applicative          ((<$>), (<*>))
+import           Control.Monad                (when)
+import           Data.Int
+import           Database.Esqueleto           (Value (..), from, select, where_,
+                                               (^.))
+import qualified Database.Esqueleto           as E
+import           Debug.Trace
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 G0
-    g1 String 
-    g2 String 
+    g1 String
+    g2 String
     g3 String
     deriving Show Eq
 G1
     g1 String maxlen=20
-    g2 String 
+    g2 String
     g3 String
     Primary g1
     deriving Show Eq
@@ -45,19 +53,19 @@ G2
     deriving Show Eq
 G3
     g1 G0Id
-    g2 String 
+    g2 String
     g3 String maxlen=20
     Primary g1 g3   -- what does this mean? g1 is a foreign key
     deriving Show Eq
 TestA
-    name1 String 
-    name2 String 
+    name1 String
+    name2 String
     Unique MyNames name1 name2
     deriving Show Eq
-TestBool 
+TestBool
     mybool Bool
     deriving Show Eq
-TestTwoStrings 
+TestTwoStrings
     firstname String
     lastname String
     deriving Show Eq
@@ -84,7 +92,7 @@ TableManyMany json
     refthree TableThreeId
     Primary refone reftwo refthree
     deriving Show Eq
-TableU 
+TableU
   refone TableOneId
   name String
   Unique SomeName name
@@ -97,20 +105,20 @@ updatePersistValue (Update a1 v a2) = trace ("updatePersistValue a2="++show a2) 
 main :: IO ()
 main = do
   [arg] <- getArgs
-  let (dbtype',dsn) = 
+  let (dbtype',dsn) =
        case arg of -- odbc system dsn
            "d" -> (DB2,"dsn=db2_test")
            "p" -> (Postgres,"dsn=pg_test")
            "m" -> (MySQL,"dsn=mysql_test")
            "s" -> (MSSQL True,"dsn=mssql_test; Trusted_Connection=True") -- mssql 2012 [full limit and offset support]
            "so" -> (MSSQL False,"dsn=mssql_test; Trusted_Connection=True") -- mssql pre 2012 [limit support only]
-           "o" -> (Oracle False,"dsn=oracle_test") -- pre oracle 12c [no support for limit and offset] 
+           "o" -> (Oracle False,"dsn=oracle_test") -- pre oracle 12c [no support for limit and offset]
            "on" -> (Oracle True,"dsn=oracle_test") -- >= oracle 12c [full limit and offset support]
            "q" -> (Sqlite False,"dsn=sqlite_test")
            "qn" -> (Sqlite True,"dsn=sqlite_test")
            xs -> error $ "unknown option:choose p m s so o on d q qn found[" ++ xs ++ "]"
 
-  runResourceT $ runNoLoggingT $ withODBCConn Nothing dsn $ runSqlConn $ do
+  runNoLoggingT $ withODBCConn Nothing dsn $ runSqlConn $ do
     conn <- ask
     let dbtype::DBType
         dbtype=read $ T.unpack $ connRDBMS conn
@@ -118,11 +126,11 @@ main = do
     liftIO $ putStrLn "\nbefore migration\n"
     runMigration migrateAll
     liftIO $ putStrLn "after migration"
-    
+
     doesq
     when True $ dostuff dbtype
 
-dostuff dbtype = do    
+dostuff dbtype = do
     z1 <- insert $ TableOne "test1 aa"
     z2 <- insert $ TableOne "test1 bb"
     a1 <- insert $ TableOne "test1 cc"
@@ -134,31 +142,31 @@ dostuff dbtype = do
 
     let b=encode $ head aa
     liftIO $ putStrLn $ "\ntojson for tableone " ++ show b
-    
+
     let c=decode' b::Maybe (Entity TableOne)
     liftIO $ putStrLn $ "\nfromjson for tableone " ++ show c
 
     a3 <- insert $ TableMany a1 a2
     liftIO $ putStrLn $ "a3=" ++ show a3
-    
+
     bb <- selectList ([]::[Filter TableMany]) []
     liftIO $ putStrLn $ "bb=" ++ show bb ++"\n\n" ++ show (toPersistValue z1)
-    
+
     zz <- selectList [TableManyRefone <. a1] [Asc TableManyRefone]
     liftIO $ putStrLn $ "\n\n!!!TESTING FILTER zz=" ++ show zz ++"\n\n"
-    
+
     let x=toJSON $ head bb
     liftIO $ putStrLn $ "\njson for a single tablemany " ++ show x
 
     let b=encode $ head bb
     liftIO $ putStrLn $ "\ntojson for a single tablemany " ++ show b
-    
+
     let c=decode' b::Maybe (Entity TableMany)
     liftIO $ putStrLn $ "fromjson for tablemany " ++ show c
 
     let b1=encode bb
     liftIO $ putStrLn $ "\ntojson for a list of tablemany " ++ show b1
-    
+
     let c1=decode' b1::Maybe [Entity TableMany]
     liftIO $ putStrLn $ "\nfromjson for list of tablemany " ++ show c1
 
@@ -187,11 +195,11 @@ dostuff dbtype = do
     liftIO $ putStrLn $ "after delete m3"
     --zzz <- get m3
     --liftIO $ putStrLn $ "after get again : should have failed zzz=" ++ show zzz
-    
+
     bb <- selectList ([]::[Filter TableManyMany]) []
     liftIO $ putStrLn $ "bb=" ++ show bb ++"\n\n"
 {-
-    xs <- select $ 
+    xs <- select $
              from $ \ln -> do
                 where_ (ln ^. TableManyRefone E.<=. E.val a1)
                 E.orderBy [E.asc (ln ^. TableManyRefone)]
@@ -200,7 +208,7 @@ dostuff dbtype = do
                 return ln
     liftIO $ putStrLn $ show (length xs) ++ " rows: limit=3 offset=2 xs=" ++ show xs
 -}
-    xs <- select $ 
+    xs <- select $
              from $ \ln -> do
                 where_ (ln ^. TableOneNameone E.<=. E.val "test1 bb")
                 E.orderBy [E.asc (ln ^. TableOneNameone)]
@@ -209,38 +217,38 @@ dostuff dbtype = do
                 return ln
     liftIO $ putStrLn $ show (length xs) ++ " rows: limit=2 offset=3 xs=" ++ show xs
 
-    a11 <- updateGet a1 [TableOneNameone =. "freee"] 
+    a11 <- updateGet a1 [TableOneNameone =. "freee"]
     liftIO $ putStrLn $ "a11=" ++ show a11
-    case dbtype of 
+    case dbtype of
       Oracle False -> liftIO $ putStrLn $ "oracle so no selectfirst"
       _ -> do
               a22 <- selectFirst [TableOneNameone ==. "freee"] [Desc TableOneNameone]
               liftIO $ putStrLn $ "a22=" ++ show a22
-    a33 <- count [TableOneNameone >=. "a"] 
+    a33 <- count [TableOneNameone >=. "a"]
     liftIO $ putStrLn $ "a33=" ++ show a33
 
     m3 <- insert $ TableManyMany c1 c2 c3
 
-    a11 <- updateGet m3 [TableManyManyRefone =. c1] 
+    a11 <- updateGet m3 [TableManyManyRefone =. c1]
     liftIO $ putStrLn $ "a11=" ++ show a11
-    case dbtype of 
+    case dbtype of
       Oracle False -> liftIO $ putStrLn $ "oracle so no selectfirst"
       _ -> do
               a22 <- selectFirst [TableManyManyReftwo ==. c2] [Desc TableManyManyRefone]
               liftIO $ putStrLn $ "a22=" ++ show a22
-    a33 <- count [TableManyManyReftwo <=. c2] 
+    a33 <- count [TableManyManyReftwo <=. c2]
     liftIO $ putStrLn $ "a33=" ++ show a33
-    
+
     a33 <- count ([]::[Filter TableOne])
     liftIO $ putStrLn $ "before =" ++ show a33
     updateWhere [TableOneNameone ==. "freee"] [TableOneNameone =. "dude"]
-    deleteWhere [TableOneNameone ==. "dude"] 
+    deleteWhere [TableOneNameone ==. "dude"]
     a33 <- count ([]::[Filter TableOne])
     liftIO $ putStrLn $ "after =" ++ show a33
 
     p4 <- selectList [TableOneNameone >=. "a"] []
     liftIO $ print p4
-    
+
     liftIO $ putStrLn $ "before selectKeys List 111"
     p4 <- selectKeysList [TableOneNameone >=. "a"] []
     liftIO $ print p4

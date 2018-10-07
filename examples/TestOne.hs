@@ -1,29 +1,37 @@
-{-# LANGUAGE QuasiQuotes, TemplateHaskell, TypeFamilies, OverloadedStrings #-}
-{-# LANGUAGE GADTs, FlexibleContexts #-}
-{-# LANGUAGE EmptyDataDecls    #-}
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables, GeneralizedNewtypeDeriving, DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE EmptyDataDecls             #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
 module TestOne where
 
-import qualified Database.Persist as P
-import Database.Persist.TH
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger
-import Control.Monad.Trans.Resource (runResourceT,MonadResource)
-import Control.Monad.Trans.Reader (ask)
-import Data.Text (Text)
-import qualified Data.Text as T
-import Database.Persist.ODBC
+import           Control.Monad.IO.Class       (liftIO)
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Reader   (ask)
+import           Control.Monad.Trans.Resource (MonadResource, runResourceT)
+import           Data.Text                    (Text)
+import qualified Data.Text                    as T
+import qualified Database.Persist             as P
+import           Database.Persist.ODBC
+import           Database.Persist.TH
 --import Data.Conduit
-import Data.Aeson
-import System.Environment (getArgs)
+import           Data.Aeson
+import           System.Environment           (getArgs)
 
-import qualified Database.Esqueleto as E
-import Database.Esqueleto (select,where_,(^.),from,Value(..))
-import Control.Applicative ((<$>),(<*>))
-import Data.Int
-import Debug.Trace
-import Control.Monad (when)
+import           Control.Applicative          ((<$>), (<*>))
+import           Control.Monad                (when)
+import           Data.Int
+import           Database.Esqueleto           (Value (..), from, select, where_,
+                                               (^.))
+import qualified Database.Esqueleto           as E
+import           Debug.Trace
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Parent99
@@ -51,14 +59,14 @@ Child7
 main :: IO ()
 main = do
   [arg] <- getArgs
-  let (dbtype',dsn) = 
+  let (dbtype',dsn) =
        case arg of -- odbc system dsn
            "d" -> (DB2,"dsn=db2_test")
            "p" -> (Postgres,"dsn=pg_test")
            "m" -> (MySQL,"dsn=mysql_test")
            "s" -> (MSSQL True,"dsn=mssql_test; Trusted_Connection=True") -- mssql 2012 [full limit and offset support]
            "so" -> (MSSQL False,"dsn=mssql_test; Trusted_Connection=True") -- mssql pre 2012 [limit support only]
-           "o" -> (Oracle False,"dsn=oracle_test") -- pre oracle 12c [no support for limit and offset] 
+           "o" -> (Oracle False,"dsn=oracle_test") -- pre oracle 12c [no support for limit and offset]
            "on" -> (Oracle True,"dsn=oracle_test") -- >= oracle 12c [full limit and offset support]
            "q" -> (Sqlite False,"dsn=sqlite_test")
            "qn" -> (Sqlite True,"dsn=sqlite_test")
@@ -73,9 +81,9 @@ main = do
     runMigration migrateAll
     liftIO $ putStrLn "after migration"
 {-
-    p1 <- insert $ Parent7 "k1a" "k1b" 100  
-    p2 <- insert $ Parent7 "k2a" "k2b" 200  
-    p3 <- insert $ Parent7 "k3a" "k3b" 300  
+    p1 <- insert $ Parent7 "k1a" "k1b" 100
+    p2 <- insert $ Parent7 "k2a" "k2b" 200
+    p3 <- insert $ Parent7 "k3a" "k3b" 300
 
     c1 <- insert $ Child7 "k1a" "k1b" 100 "extra11"
     c1a <- insert $ Child7 "k1a" "k1b" 100 "extra11aa"
@@ -84,18 +92,18 @@ main = do
 -}
 {-
     liftIO $ putStrLn "before esqueleto test 1"
-    xs <- select $ 
+    xs <- select $
            from $ \p -> do
               where_ (p ^. Parent7Name2 E.==. E.val "k1b")
               return p
-    liftIO $ putStrLn $ "xs=" ++ show xs          
+    liftIO $ putStrLn $ "xs=" ++ show xs
 -}
     liftIO $ putStrLn "before esqueleto test 2"
-    ys <- select $ 
+    ys <- select $
            from $ \(p,c) -> do
               where_ (p ^. Parent7Name2 E.==. c ^. Child7Name2)
               return (p,c)
-    liftIO $ putStrLn $ "ys=" ++ show ys          
+    liftIO $ putStrLn $ "ys=" ++ show ys
 
 
     liftIO $ putStrLn "before esqueleto test 3"
@@ -103,25 +111,25 @@ main = do
                  from $ \(c `E.InnerJoin` p) -> do
                  E.on $ p ^. Parent7Name E.==. c ^. Child7Name
                  return (p,c)
-    liftIO $ putStrLn $ "bs=" ++ show bs          
+    liftIO $ putStrLn $ "bs=" ++ show bs
 
 {-
     liftIO $ putStrLn "before esqueleto test 4"
-    zs <- select $ 
+    zs <- select $
            from $ \p -> do
               where_ (p ^. Parent7Id E.==. E.valkey (Parent7 "k1a" "k1b" 100))
               return p
-    liftIO $ putStrLn $ "zs=" ++ show zs      
+    liftIO $ putStrLn $ "zs=" ++ show zs
 
-    liftIO $ putStrLn "before esqueleto test 5"    
-    ws <- select $ 
+    liftIO $ putStrLn "before esqueleto test 5"
+    ws <- select $
            from $ \(p,c) -> do
               where_ (c ^. Child7Extra E.==. E.val "extra11" E.&&. p ^. Parent7Id E.==. c ^. Child7Parent7)
               return (p,c)
-    liftIO $ putStrLn $ "ws=" ++ show ws          
+    liftIO $ putStrLn $ "ws=" ++ show ws
 -}
     return ()
-    
+
 {-
 before esqueleto test 2
 *** Exception: SqlError {seState = "[\"42S22\"]", seNativeError = -1, seErrorMsg
